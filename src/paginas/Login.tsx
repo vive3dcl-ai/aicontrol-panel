@@ -1,104 +1,165 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { api } from "../api";
 import { useMarca } from "../marca";
 import { destinoInicio, useSesion } from "../sesion";
 import { Alert, Button, Card, Input, Marca } from "../componentes/ui";
 import { cuentaLocalInicial, cuentasLocales, type CuentaLocal } from "../local";
 
 export function LoginCliente() {
-  const { usuario, listo, entrar } = useSesion();
-  const marca = useMarca();
-  const inicial = cuentaLocalInicial("cliente");
-  const [correo, setCorreo] = useState(inicial.correo);
-  const [clave, setClave] = useState(inicial.clave);
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false);
-
-  if (!listo) {
-    return <div className="flex min-h-screen items-center justify-center text-muted">Cargando...</div>;
-  }
-  if (usuario) return <Navigate to={destinoInicio(usuario.rol)} replace />;
-
-  async function enviar(evento: React.FormEvent) {
-    evento.preventDefault();
-    setError("");
-    setCargando(true);
-    try {
-      await entrar(correo.trim(), clave);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo entrar");
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <Marca grande sigla={marca.sigla} />
-        <h1 className="text-xl font-bold text-ink">{marca.nombre}</h1>
-        <p className="mt-1 text-sm text-muted">Inicia sesión en tu cuenta</p>
-        <form onSubmit={enviar} className="mt-6 space-y-4">
-          {error ? <Alert message={error} /> : null}
-          <Input label="Email" type="email" autoComplete="username" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
-          <Input label="Contraseña" type="password" autoComplete="current-password" value={clave} onChange={(evento) => setClave(evento.target.value)} required />
-          <Button type="submit" disabled={cargando} className="w-full">
-            {cargando ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
-        <CuentasLocales ambito="cliente" entrar={entrar} />
-      </Card>
-    </div>
-  );
+  return <Acceso ambito="cliente" subtitulo="Inicia sesión en tu cuenta" />;
 }
 
 export function LoginPlataforma() {
-  const { usuario, listo, entrar } = useSesion();
-  const marca = useMarca();
-  const inicial = cuentaLocalInicial("plataforma");
-  const [correo, setCorreo] = useState(inicial.correo);
-  const [clave, setClave] = useState(inicial.clave);
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false);
-
-  if (!listo) {
-    return <div className="flex min-h-screen items-center justify-center text-muted">Cargando...</div>;
-  }
-  if (usuario) return <Navigate to={destinoInicio(usuario.rol)} replace />;
-
-  async function enviar(evento: React.FormEvent) {
-    evento.preventDefault();
-    setError("");
-    setCargando(true);
-    try {
-      await entrar(correo.trim(), clave, "plataforma");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo entrar");
-    } finally {
-      setCargando(false);
-    }
-  }
-
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <Marca grande sigla={marca.sigla} />
-        <h1 className="text-xl font-bold text-ink">{marca.nombre} Admin</h1>
-        <p className="mt-1 text-sm text-muted">Inicia sesión para gestionar la plataforma</p>
-        <form onSubmit={enviar} className="mt-6 space-y-4">
-          {error ? <Alert message={error} /> : null}
-          <Input label="Email" type="email" autoComplete="username" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
-          <Input label="Contraseña" type="password" autoComplete="current-password" value={clave} onChange={(evento) => setClave(evento.target.value)} required />
-          <Button type="submit" disabled={cargando} className="w-full">
-            {cargando ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
-        <CuentasLocales ambito="plataforma" entrar={entrar} />
+    <Acceso
+      ambito="plataforma"
+      subtitulo="Inicia sesión para gestionar la plataforma"
+      pie={
         <p className="mt-4 text-center text-sm text-muted">
           <Link to="/login" className="text-ink hover:underline">
             Volver
           </Link>
         </p>
+      }
+    />
+  );
+}
+
+function Acceso({
+  ambito,
+  subtitulo,
+  pie,
+}: {
+  ambito: "cliente" | "plataforma";
+  subtitulo: string;
+  pie?: React.ReactNode;
+}) {
+  const { usuario, listo, entrar } = useSesion();
+  const marca = useMarca();
+  const inicial = cuentaLocalInicial(ambito);
+  const [correo, setCorreo] = useState(inicial.correo);
+  const [clave, setClave] = useState(inicial.clave);
+  const [codigo, setCodigo] = useState("");
+  const [claveNueva, setClaveNueva] = useState("");
+  const [paso, setPaso] = useState<"clave" | "mfa" | "recuperar" | "nueva">("clave");
+  const [error, setError] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [cargando, setCargando] = useState(false);
+
+  if (!listo) {
+    return <div className="flex min-h-screen items-center justify-center text-muted">Cargando...</div>;
+  }
+  if (usuario) return <Navigate to={usuario.debeCambiarClave ? "/cuenta" : destinoInicio(usuario.rol)} replace />;
+
+  async function enviar(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    setCargando(true);
+    try {
+      const resultado = await entrar(
+        correo.trim(),
+        clave,
+        ambito === "plataforma" ? "plataforma" : undefined,
+        paso === "mfa" ? codigo : undefined,
+      );
+      if (resultado === "mfa") setPaso("mfa");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo entrar");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function pedirCodigo(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    setCargando(true);
+    try {
+      await api("/v1/sesion/recuperar", { method: "POST", body: JSON.stringify({ correo: correo.trim() }) });
+      setAviso("Si el correo está registrado, enviamos un código de 6 dígitos.");
+      setPaso("nueva");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar el código");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function confirmarClave(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    setCargando(true);
+    try {
+      await api("/v1/sesion/recuperar/confirmar", {
+        method: "POST",
+        body: JSON.stringify({ correo: correo.trim(), codigo, clave: claveNueva }),
+      });
+      setClave("");
+      setCodigo("");
+      setClaveNueva("");
+      setAviso("La clave quedó actualizada. Entra con la nueva.");
+      setPaso("clave");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar la clave");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <Marca logo sigla={marca.sigla} />
+        <p className="mt-1 text-center text-sm text-muted">{subtitulo}</p>
+        {paso === "clave" || paso === "mfa" ? (
+          <form onSubmit={enviar} className="mt-6 space-y-4">
+            {aviso ? <Alert type="success" message={aviso} onClose={() => setAviso("")} /> : null}
+            {error ? <Alert message={error} /> : null}
+            <Input label="Email" type="email" autoComplete="username" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
+            <Input label="Contraseña" type="password" autoComplete="current-password" value={clave} onChange={(evento) => setClave(evento.target.value)} required />
+            {paso === "mfa" ? (
+              <Input label="Código de 6 dígitos" inputMode="numeric" autoComplete="one-time-code" value={codigo} onChange={(evento) => setCodigo(evento.target.value)} required />
+            ) : null}
+            <Button type="submit" disabled={cargando} className="w-full">
+              {cargando ? "Entrando..." : "Entrar"}
+            </Button>
+            {paso === "clave" ? (
+              <button type="button" className="w-full text-center text-sm text-muted hover:text-ink" onClick={() => { setError(""); setPaso("recuperar"); }}>
+                Recuperar contraseña
+              </button>
+            ) : null}
+          </form>
+        ) : null}
+        {paso === "recuperar" ? (
+          <form onSubmit={pedirCodigo} className="mt-6 space-y-4">
+            {error ? <Alert message={error} /> : null}
+            <Input label="Email" type="email" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
+            <Button type="submit" disabled={cargando} className="w-full">{cargando ? "Enviando..." : "Enviar código"}</Button>
+            <button type="button" className="w-full text-center text-sm text-muted hover:text-ink" onClick={() => setPaso("clave")}>Volver</button>
+          </form>
+        ) : null}
+        {paso === "nueva" ? (
+          <form onSubmit={confirmarClave} className="mt-6 space-y-4">
+            {aviso ? <Alert type="success" message={aviso} /> : null}
+            {error ? <Alert message={error} /> : null}
+            <Input label="Código" inputMode="numeric" value={codigo} onChange={(evento) => setCodigo(evento.target.value)} required />
+            <Input label="Clave nueva" type="password" autoComplete="new-password" value={claveNueva} onChange={(evento) => setClaveNueva(evento.target.value)} required />
+            <Button type="submit" disabled={cargando} className="w-full">{cargando ? "Guardando..." : "Guardar clave"}</Button>
+          </form>
+        ) : null}
+        {paso === "clave" ? (
+          <CuentasLocales
+            ambito={ambito}
+            entrar={entrar}
+            alPedirMfa={(cuenta) => {
+              setCorreo(cuenta.correo);
+              setClave(cuenta.clave);
+              setPaso("mfa");
+            }}
+          />
+        ) : null}
+        {pie}
       </Card>
     </div>
   );
@@ -107,9 +168,11 @@ export function LoginPlataforma() {
 function CuentasLocales({
   ambito,
   entrar,
+  alPedirMfa,
 }: {
   ambito: "cliente" | "plataforma";
-  entrar: (correo: string, clave: string, puerta?: "plataforma") => Promise<void>;
+  entrar: (correo: string, clave: string, puerta?: "plataforma") => Promise<"ok" | "mfa">;
+  alPedirMfa: (cuenta: CuentaLocal) => void;
 }) {
   const cuentas = cuentasLocales(ambito);
   const [error, setError] = useState("");
@@ -118,7 +181,8 @@ function CuentasLocales({
   async function usar(cuenta: CuentaLocal) {
     setError("");
     try {
-      await entrar(cuenta.correo, cuenta.clave, ambito === "plataforma" ? "plataforma" : undefined);
+      const resultado = await entrar(cuenta.correo, cuenta.clave, ambito === "plataforma" ? "plataforma" : undefined);
+      if (resultado === "mfa") alPedirMfa(cuenta);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo entrar");
     }

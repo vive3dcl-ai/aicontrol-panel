@@ -115,7 +115,7 @@ export function Flota() {
       <PageHeader
         title="Flota"
         subtitle={flotaGlobal ? "Cada organización lista sus equipos. El alta guarda la identidad de la máquina." : "Esta organización lista solo sus equipos. El alta guarda la identidad de la máquina."}
-        action={<Button variant="secondary" onClick={recargar}>Actualizar</Button>}
+        action={<Button variant="secondary" onClick={() => recargar()}>Actualizar</Button>}
       />
       {aviso ? (
         <Alert

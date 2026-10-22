@@ -15,12 +15,15 @@ export type Usuario = {
   ambito?: AmbitoSesion;
   usuarioSesion?: string | null;
   grupos?: { id: string; nombre: string }[];
+  debeCambiarClave?: boolean;
+  mfaActivo?: boolean;
 };
 
 type Sesion = {
   usuario: Usuario | null;
   listo: boolean;
-  entrar: (correo: string, clave: string, ambito?: Ambito) => Promise<void>;
+  entrar: (correo: string, clave: string, ambito?: Ambito, codigo?: string) => Promise<"ok" | "mfa">;
+  fijarUsuario: (usuario: Usuario) => void;
   entrarSoporte: (tenantId: string) => Promise<void>;
   salirSoporte: () => Promise<void>;
   salir: () => void;
@@ -51,18 +54,23 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
     () => ({
       usuario,
       listo,
-      async entrar(correo: string, clave: string, ambito?: Ambito) {
-        const datos = await api<{ token: string; usuario: Usuario }>("/v1/sesion/login", {
+      async entrar(correo: string, clave: string, ambito?: Ambito, codigo?: string) {
+        const datos = await api<{ token?: string; usuario?: Usuario; mfaRequerido?: boolean }>("/v1/sesion/login", {
           method: "POST",
           body: JSON.stringify({
             correo,
             clave,
             ...(ambito ? { ambito } : {}),
+            ...(codigo ? { codigo } : {}),
           }),
         });
+        if (datos.mfaRequerido) return "mfa";
+        if (!datos.token || !datos.usuario) throw new Error("No se pudo entrar");
         guardarToken(datos.token);
         setUsuario(datos.usuario);
+        return "ok";
       },
+      fijarUsuario: setUsuario,
       async entrarSoporte(tenantId: string) {
         const datos = await api<{ token: string; usuario: Usuario }>("/v1/sesion/soporte", {
           method: "POST",
@@ -131,6 +139,7 @@ export function navegacion(rol: string) {
       { to: "/admin/cluster", label: "Cluster" },
       { to: "/admin/base-ia", label: "Base de IA" },
       { to: "/admin/ajustes", label: "Ajustes" },
+      { to: "/admin/actualizadores", label: "Actualizadores" },
       { to: "/admin/registros", label: "Registros" },
       { to: "/flota", label: "Flota" },
       { to: "/usuarios", label: "Usuarios" },

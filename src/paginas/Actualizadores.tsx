@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, tokenGuardado } from "../api";
-import { Alert, Badge, Button, Cargando, Input, PageHeader } from "../componentes/ui";
+import { Alert, Badge, Button, Cargando, Input, Modal, PageHeader, Select, Textarea } from "../componentes/ui";
 
 const SISTEMAS = ["windows", "linux", "darwin"] as const;
+const NOMBRES: Record<(typeof SISTEMAS)[number], string> = { windows: "Windows", linux: "Linux", darwin: "Mac" };
+const MARCAS: Record<(typeof SISTEMAS)[number], string> = { windows: "GOBBIN01", linux: "GOBLIN01", darwin: "GOBMAC01" };
 
 type Acceso = { id: string; nombre: string; sistemas: string[]; revocado: boolean; creadoEn: string };
 type Version = {
@@ -24,6 +26,8 @@ export function Actualizadores() {
   const [sistemas, setSistemas] = useState<string[]>([...SISTEMAS]);
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [publicar, setPublicar] = useState(false);
   const [ocupado, setOcupado] = useState("");
 
   async function cargar() {
@@ -115,7 +119,12 @@ export function Actualizadores() {
 
   return (
     <section>
-      <PageHeader title="Actualizadores" subtitle="Los tokens suben paquetes. Quedan pendientes hasta que los apruebes." />
+      <PageHeader
+        title="Actualizadores"
+        subtitle="Los tokens suben paquetes. Quedan pendientes hasta que los apruebes."
+        action={<Button onClick={() => setPublicar(true)}>Publicar</Button>}
+      />
+      {aviso ? <Alert type="success" message={aviso} onClose={() => setAviso("")} /> : null}
       {error ? <div className="mb-4"><Alert inline message={error} /></div> : null}
       {token ? <Alert type="success" message={`Copia el token ahora. No se vuelve a mostrar: ${token}`} /> : null}
       <div className="mb-4 flex gap-2 border-b border-line">
@@ -152,7 +161,7 @@ export function Actualizadores() {
                     checked={sistemas.includes(sistema)}
                     onChange={(evento) => setSistemas(evento.target.checked ? [...sistemas, sistema] : sistemas.filter((item) => item !== sistema))}
                   />
-                  {sistema}
+                  {NOMBRES[sistema]}
                 </label>
               ))}
             </div>
@@ -162,7 +171,7 @@ export function Actualizadores() {
             <div key={acceso.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-surface p-4">
               <div>
                 <p className="font-medium text-ink">{acceso.nombre}</p>
-                <p className="text-sm text-muted">{acceso.sistemas.join(", ") || "sin sistemas"}</p>
+                <p className="text-sm text-muted">{acceso.sistemas.map((sistema) => NOMBRES[sistema as (typeof SISTEMAS)[number]] ?? sistema).join(", ") || "sin sistemas"}</p>
               </div>
               {acceso.revocado ? <Badge>Revocado</Badge> : (
                 <Button variant="danger" disabled={ocupado === acceso.id} onClick={() => void revocar(acceso.id)}>Revocar</Button>
@@ -171,6 +180,16 @@ export function Actualizadores() {
           ))}
         </div>
       ) : null}
+      <PublicarModal
+        abierto={publicar}
+        versiones={versiones ?? []}
+        onCerrar={() => setPublicar(false)}
+        onListo={async (texto) => {
+          setAviso(texto);
+          setPublicar(false);
+          await cargar();
+        }}
+      />
     </section>
   );
 }
@@ -190,7 +209,7 @@ function Fila({
   return (
     <div className="rounded-md border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="font-medium text-ink">{fila.sistema} {fila.version}</p>
+        <p className="font-medium text-ink">{NOMBRES[fila.sistema as (typeof SISTEMAS)[number]] ?? fila.sistema} {fila.version}</p>
         <Badge color={color}>{fila.estado}</Badge>
       </div>
       <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{fila.cambios || "Sin notas"}</p>
@@ -217,5 +236,184 @@ function Pestaña({ activa, onClick, children }: { activa: boolean; onClick: () 
     >
       {children}
     </button>
+  );
+}
+
+function versionSiguiente(versiones: string[]) {
+  const validas = versiones.filter((version) => /^\d+\.\d+\.\d+$/.test(version));
+  if (validas.length === 0) return "0.1.0";
+  const mayor = validas.reduce((mejor, actual) => (comparar(actual, mejor) > 0 ? actual : mejor));
+  const [a, b, c] = mayor.split(".").map((parte) => Number.parseInt(parte, 10) || 0);
+  return `${a}.${b}.${c + 1}`;
+}
+
+function comparar(izquierda: string, derecha: string) {
+  const a = izquierda.split(".").map((parte) => Number.parseInt(parte, 10) || 0);
+  const b = derecha.split(".").map((parte) => Number.parseInt(parte, 10) || 0);
+  const largo = Math.max(a.length, b.length);
+  for (let i = 0; i < largo; i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0) ? -1 : 1;
+  }
+  return 0;
+}
+
+function terminaCon(bytes: Uint8Array, marca: string) {
+  const aguja = new TextEncoder().encode(marca);
+  if (bytes.length < aguja.length) return false;
+  const inicio = bytes.length - aguja.length;
+  for (let i = 0; i < aguja.length; i += 1) if (bytes[inicio + i] !== aguja[i]) return false;
+  return true;
+}
+
+function contiene(bytes: Uint8Array, texto: string) {
+  const aguja = new TextEncoder().encode(texto);
+  for (let i = 0; i + aguja.length <= bytes.length; i += 1) {
+    let igual = true;
+    for (let j = 0; j < aguja.length; j += 1) {
+      if (bytes[i + j] !== aguja[j]) {
+        igual = false;
+        break;
+      }
+    }
+    if (!igual) continue;
+    const antes = i === 0 ? 0 : bytes[i - 1];
+    const despues = i + aguja.length >= bytes.length ? 0 : bytes[i + aguja.length];
+    const digito = (byte: number) => byte >= 48 && byte <= 57;
+    if (!digito(antes) && !digito(despues)) return true;
+  }
+  return false;
+}
+
+function contieneUtf16(bytes: Uint8Array, texto: string) {
+  const aguja = new Uint8Array(texto.length * 2);
+  for (let i = 0; i < texto.length; i += 1) {
+    aguja[i * 2] = texto.charCodeAt(i);
+    aguja[i * 2 + 1] = 0;
+  }
+  for (let i = 0; i + aguja.length <= bytes.length; i += 1) {
+    let igual = true;
+    for (let j = 0; j < aguja.length; j += 1) {
+      if (bytes[i + j] !== aguja[j]) {
+        igual = false;
+        break;
+      }
+    }
+    if (igual) return true;
+  }
+  return false;
+}
+
+function paqueteTraeVersion(sistema: (typeof SISTEMAS)[number], bytes: Uint8Array, version: string) {
+  if (!terminaCon(bytes, MARCAS[sistema])) return false;
+  if (sistema === "windows") return contieneUtf16(bytes, `${version}.0`);
+  return contiene(bytes, version);
+}
+
+async function archivoDe(archivo: File) {
+  const buffer = await archivo.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binario = "";
+  const bloque = 0x8000;
+  for (let i = 0; i < bytes.length; i += bloque) {
+    binario += String.fromCharCode(...bytes.subarray(i, i + bloque));
+  }
+  const hash = await crypto.subtle.digest("SHA-256", buffer);
+  const sha256 = [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { nombre: archivo.name, sha256, base64: btoa(binario), bytes };
+}
+
+function PublicarModal({
+  abierto,
+  versiones,
+  onCerrar,
+  onListo,
+}: {
+  abierto: boolean;
+  versiones: Version[];
+  onCerrar: () => void;
+  onListo: (texto: string) => Promise<void>;
+}) {
+  const [sistema, setSistema] = useState<(typeof SISTEMAS)[number]>("windows");
+  const [cambios, setCambios] = useState("");
+  const [actualizador, setActualizador] = useState<File | null>(null);
+  const [instalador, setInstalador] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const version = versionSiguiente(versiones.filter((fila) => fila.sistema === sistema).map((fila) => fila.version));
+
+  async function publicar(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!actualizador || !instalador) {
+      setError("Elegí el instalador y el actualizador");
+      return;
+    }
+    if (actualizador.name === instalador.name) {
+      setError("El instalador y el actualizador tienen que llamarse distinto");
+      return;
+    }
+    setOcupado(true);
+    setError("");
+    try {
+      const paquete = await archivoDe(actualizador);
+      if (!paqueteTraeVersion(sistema, paquete.bytes, version)) {
+        setError(`El actualizador no es un paquete de ${NOMBRES[sistema]} con la versión ${version}`);
+        return;
+      }
+      const setup = await archivoDe(instalador);
+      await api("/v1/actualizaciones", {
+        method: "POST",
+        body: JSON.stringify({
+          sistema,
+          version,
+          cambios: cambios.trim(),
+          sha256: paquete.sha256,
+          archivoNombre: paquete.nombre,
+          archivoBase64: paquete.base64,
+          instaladorNombre: setup.nombre,
+          instaladorSha256: setup.sha256,
+          instaladorBase64: setup.base64,
+        }),
+      });
+      setCambios("");
+      setActualizador(null);
+      setInstalador(null);
+      await onListo(`Versión ${version} de ${NOMBRES[sistema]} publicada.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo publicar la versión");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={abierto}
+      onClose={onCerrar}
+      title="Publicar agente"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
+          <Button type="submit" form="form-publicar" disabled={ocupado}>{ocupado ? "Publicando..." : "Publicar"}</Button>
+        </div>
+      }
+    >
+      <form id="form-publicar" onSubmit={publicar} className="space-y-4">
+        <p className="text-sm text-muted">Sube el instalador para un cliente nuevo y el paquete que el agente se aplica solo. Publicar no lo manda a la flota.</p>
+        {error ? <Alert inline message={error} /> : null}
+        <Select label="Sistema" value={sistema} onChange={(evento) => setSistema(evento.target.value as (typeof SISTEMAS)[number])}>
+          {SISTEMAS.map((item) => <option key={item} value={item}>{NOMBRES[item]}</option>)}
+        </Select>
+        <p className="text-sm text-ink">Versión {version}</p>
+        <Textarea label="Cambios de la versión" value={cambios} onChange={(evento) => setCambios(evento.target.value)} required />
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-muted">Instalador</span>
+          <input type="file" className="block w-full text-sm text-ink" onChange={(evento) => setInstalador(evento.target.files?.[0] ?? null)} required />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-muted">Actualizador automático</span>
+          <input type="file" className="block w-full text-sm text-ink" onChange={(evento) => setActualizador(evento.target.files?.[0] ?? null)} required />
+        </label>
+      </form>
+    </Modal>
   );
 }

@@ -202,16 +202,14 @@ export function Cargando({ texto = "Cargando..." }: { texto?: string }) {
 export function Marca({ grande = false, sigla = "G", logo = false }: { grande?: boolean; sigla?: string; logo?: boolean }) {
   if (logo) {
     return (
-      <div className="mx-auto mb-4 flex justify-center rounded-xl bg-black px-4 py-3">
+      <div className="mx-auto mb-4 flex justify-center px-4 py-3" title={sigla}>
         <img src="/logo.png" alt="AIcontrol" className="h-16 w-auto max-w-full" />
       </div>
     );
   }
-  const medida = grande ? "mx-auto mb-4 h-20 w-20" : "h-8 w-8";
+  const medida = grande ? "mx-auto mb-4 h-20 w-20" : "h-8 w-auto";
   return (
-    <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-md bg-black ${medida}`} title={sigla}>
-      <img src="/isotipo.png" alt="AIcontrol" className="h-full w-full object-contain" />
-    </div>
+    <img src={grande ? "/logo.png" : "/isotipo.png"} alt="AIcontrol" className={`shrink-0 object-contain ${medida}`} title={sigla} />
   );
 }
 

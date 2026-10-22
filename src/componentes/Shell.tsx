@@ -94,11 +94,8 @@ function Marco({ usuario, children }: { usuario: Usuario; children: ReactNode })
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Marca sigla={marca.sigla} />
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-ink sm:text-lg">{marca.nombre}</h1>
-            {usuario.tenantNombre ? <p className="truncate text-xs text-muted">{usuario.tenantNombre}</p> : null}
-          </div>
+          <img src="/logo.png" alt={marca.nombre} className="h-8 w-auto max-w-[11rem] object-contain sm:max-w-[14rem]" />
+          {usuario.tenantNombre ? <p className="min-w-0 truncate text-xs text-muted">{usuario.tenantNombre}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {veCampana(usuario) ? <Campana /> : null}

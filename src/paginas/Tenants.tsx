@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLista } from "../datos";
 import { useSesion } from "../sesion";
-import { Alert, Button, Card, Cargando, Input, Modal, PageHeader, Select, Table, Textarea } from "../componentes/ui";
+import { Alert, Button, Cargando, Input, Modal, PageHeader, Table } from "../componentes/ui";
 
 type Tenant = { id: string; nombre: string; slug: string };
 
@@ -63,7 +63,6 @@ export function Tenants() {
         action={<Button onClick={() => { setError(""); setAbierto(true); }}>Nuevo tenant</Button>}
       />
       {mensaje ? <Alert type="success" message={mensaje} onClose={() => setMensaje("")} /> : null}
-      {usuario && usuario.ambito === "plataforma" ? <PublicarAgente onListo={setMensaje} onError={setError} /> : null}
       {error && !abierto && !editando ? <div className="mb-4"><Alert inline message={error} /></div> : null}
       {lista.error ? <div className="mb-4"><Alert inline message={lista.error} /></div> : null}
       {lista.cargando ? <Cargando /> : null}
@@ -143,97 +142,5 @@ export function Tenants() {
         </form>
       </Modal>
     </section>
-  );
-}
-
-function PublicarAgente({ onListo, onError }: { onListo: (texto: string) => void; onError: (texto: string) => void }) {
-  const [sistema, setSistema] = useState("windows");
-  const [version, setVersion] = useState("0.1.0");
-  const [cambios, setCambios] = useState("");
-  const [actualizador, setActualizador] = useState<File | null>(null);
-  const [instalador, setInstalador] = useState<File | null>(null);
-  const [ocupado, setOcupado] = useState(false);
-
-  async function archivoDe(archivo: File) {
-    const buffer = await archivo.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binario = "";
-    const bloque = 0x8000;
-    for (let i = 0; i < bytes.length; i += bloque) {
-      binario += String.fromCharCode(...bytes.subarray(i, i + bloque));
-    }
-    const hash = await crypto.subtle.digest("SHA-256", buffer);
-    const sha256 = [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    return { nombre: archivo.name, sha256, base64: btoa(binario) };
-  }
-
-  async function publicar(evento: React.FormEvent) {
-    evento.preventDefault();
-    if (!actualizador || !instalador) {
-      onError("Elegí el instalador y el actualizador");
-      return;
-    }
-    if (actualizador.name === instalador.name) {
-      onError("El instalador y el actualizador tienen que llamarse distinto");
-      return;
-    }
-    setOcupado(true);
-    onError("");
-    try {
-      const paquete = await archivoDe(actualizador);
-      const setup = await archivoDe(instalador);
-      await api("/v1/actualizaciones", {
-        method: "POST",
-        body: JSON.stringify({
-          sistema,
-          version: version.trim(),
-          cambios: cambios.trim(),
-          sha256: paquete.sha256,
-          archivoNombre: paquete.nombre,
-          archivoBase64: paquete.base64,
-          instaladorNombre: setup.nombre,
-          instaladorSha256: setup.sha256,
-          instaladorBase64: setup.base64,
-        }),
-      });
-      const nombres: Record<string, string> = { windows: "Windows", linux: "Linux", darwin: "macOS" };
-      onListo(`Versión ${version.trim()} de ${nombres[sistema] ?? sistema} publicada.`);
-      setCambios("");
-      setActualizador(null);
-      setInstalador(null);
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "No se pudo publicar la versión");
-    } finally {
-      setOcupado(false);
-    }
-  }
-
-  return (
-    <Card className="mb-4">
-      <h2 className="text-base font-semibold text-ink">Publicar agente</h2>
-      <p className="mt-1 text-sm text-muted">Sube el instalador para los clientes y el paquete que el agente se aplica solo. Publicar no instala nada.</p>
-      <form onSubmit={publicar} className="mt-4 grid gap-3 md:grid-cols-2">
-        <Select label="Sistema" value={sistema} onChange={(evento) => setSistema(evento.target.value)}>
-          <option value="windows">Windows</option>
-          <option value="linux">Linux</option>
-          <option value="darwin">macOS</option>
-        </Select>
-        <Input label="Versión" value={version} onChange={(evento) => setVersion(evento.target.value)} required />
-        <div className="md:col-span-2">
-          <Textarea label="Cambios de la versión" value={cambios} onChange={(evento) => setCambios(evento.target.value)} required />
-        </div>
-        <label className="block space-y-1.5 md:col-span-2">
-          <span className="text-sm font-medium text-muted">Instalador</span>
-          <input type="file" className="block w-full text-sm text-ink" onChange={(evento) => setInstalador(evento.target.files?.[0] ?? null)} required />
-        </label>
-        <label className="block space-y-1.5 md:col-span-2">
-          <span className="text-sm font-medium text-muted">Actualizador automático</span>
-          <input type="file" className="block w-full text-sm text-ink" onChange={(evento) => setActualizador(evento.target.files?.[0] ?? null)} required />
-        </label>
-        <div>
-          <Button type="submit" disabled={ocupado}>{ocupado ? "Publicando..." : "Publicar"}</Button>
-        </div>
-      </form>
-    </Card>
   );
 }

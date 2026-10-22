@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useTheme } from "./tema";
 import { Shell } from "./componentes/Shell";
 import { Cargando } from "./componentes/ui";
 import { destinoInicio, useSesion } from "./sesion";
@@ -24,6 +26,16 @@ import { Planes } from "./paginas/Planes";
 import { Pagos } from "./paginas/Pagos";
 import { MetodosPago } from "./paginas/MetodosPago";
 import { Facturacion } from "./paginas/Facturacion";
+
+function TemaDelTenant() {
+  const { usuario } = useSesion();
+  const { setMode } = useTheme();
+  const tema = usuario?.tema;
+  useEffect(() => {
+    if (tema === "light" || tema === "dark") setMode(tema);
+  }, [tema, setMode]);
+  return null;
+}
 
 function destinoSinSesion() {
   return sessionStorage.getItem("gobernanza-puerta") || "/login";
@@ -53,6 +65,8 @@ function Puerta() {
 
 export default function App() {
   return (
+    <>
+    <TemaDelTenant />
     <Routes>
       <Route path="/login" element={<LoginCliente />} />
       <Route path="/t/:slug" element={<Navigate to="/login" replace />} />
@@ -69,20 +83,21 @@ export default function App() {
       <Route path="/admin/planes" element={<Privado roles={["superadmin", "admin"]}><Planes /></Privado>} />
       <Route path="/admin/pagos" element={<Privado roles={["superadmin", "admin"]}><Pagos /></Privado>} />
       <Route path="/admin/medios" element={<Privado roles={["superadmin", "admin"]}><MetodosPago /></Privado>} />
-      <Route path="/facturacion" element={<Privado roles={["responsable_seguridad", "analista", "operador", "user"]}><Facturacion /></Privado>} />
-      <Route path="/flota" element={<Privado roles={["superadmin", "admin", "responsable_seguridad", "analista", "operador"]}><Flota /></Privado>} />
-      <Route path="/actividad" element={<Privado roles={["responsable_seguridad", "analista", "operador"]}><Actividad /></Privado>} />
-      <Route path="/politicas" element={<Privado roles={["responsable_seguridad", "analista"]}><Politicas /></Privado>} />
-      <Route path="/avisos" element={<Privado roles={["responsable_seguridad", "analista", "operador", "user"]}><Avisos /></Privado>} />
-      <Route path="/notificaciones" element={<Privado roles={["superadmin", "admin", "responsable_seguridad", "analista", "operador"]}><Notificaciones /></Privado>} />
-      <Route path="/usuarios" element={<Privado roles={["superadmin", "admin", "responsable_seguridad"]}><Cuentas /></Privado>} />
-      <Route path="/grupos" element={<Privado roles={["responsable_seguridad"]}><Grupos /></Privado>} />
+      <Route path="/facturacion" element={<Privado roles={["administrador", "responsable_seguridad", "analista", "operador", "user"]}><Facturacion /></Privado>} />
+      <Route path="/flota" element={<Privado roles={["superadmin", "admin", "administrador", "responsable_seguridad", "analista", "operador"]}><Flota /></Privado>} />
+      <Route path="/actividad" element={<Privado roles={["administrador", "responsable_seguridad", "analista", "operador"]}><Actividad /></Privado>} />
+      <Route path="/politicas" element={<Privado roles={["administrador", "responsable_seguridad", "analista"]}><Politicas /></Privado>} />
+      <Route path="/avisos" element={<Privado roles={["administrador", "responsable_seguridad", "analista", "operador", "user"]}><Avisos /></Privado>} />
+      <Route path="/notificaciones" element={<Privado roles={["superadmin", "admin", "administrador", "responsable_seguridad", "analista", "operador"]}><Notificaciones /></Privado>} />
+      <Route path="/usuarios" element={<Privado roles={["superadmin", "admin", "administrador", "responsable_seguridad"]}><Cuentas /></Privado>} />
+      <Route path="/grupos" element={<Privado roles={["administrador", "responsable_seguridad"]}><Grupos /></Privado>} />
       <Route path="/cuentas" element={<Navigate to="/usuarios" replace />} />
-      <Route path="/ajustes" element={<Privado roles={["responsable_seguridad"]}><Ajustes /></Privado>} />
-      <Route path="/actualizaciones" element={<Privado roles={["responsable_seguridad"]}><Actualizaciones /></Privado>} />
+      <Route path="/ajustes" element={<Privado roles={["administrador", "responsable_seguridad"]}><Ajustes /></Privado>} />
+      <Route path="/actualizaciones" element={<Privado roles={["administrador", "responsable_seguridad"]}><Actualizaciones /></Privado>} />
       <Route path="/agentes" element={<Navigate to="/politicas" replace />} />
-      <Route path="/base-ia" element={<Privado roles={["responsable_seguridad"]}><BaseIa /></Privado>} />
+      <Route path="/base-ia" element={<Privado roles={["administrador", "responsable_seguridad"]}><BaseIa /></Privado>} />
       <Route path="*" element={<Puerta />} />
     </Routes>
+    </>
   );
 }

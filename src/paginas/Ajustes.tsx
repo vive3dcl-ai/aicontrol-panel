@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useLista } from "../datos";
-import { Alert, Button, Card, Cargando, Input, PageHeader } from "../componentes/ui";
+import { useSesion } from "../sesion";
+import { useTheme } from "../tema";
+import { Alert, Button, Card, Cargando, Input, PageHeader, Select } from "../componentes/ui";
+
+type PlanOpcion = { id: string; nombre: string; asientos: number; precio: string; demo: boolean };
 
 type AjustesTenant = {
   ambito: "tenant";
@@ -9,9 +13,22 @@ type AjustesTenant = {
   claveAutorizacion: string;
   expira: string;
   feedIaActivo: boolean;
+  nombre: string;
+  tema: "light" | "dark";
+  planId: string | null;
+  modo: string;
+  razonSocial: string;
+  rut: string;
+  giro: string;
+  direccion: string;
+  correo: string;
+  planes: PlanOpcion[];
 };
 
 export function Ajustes() {
+  const { usuario } = useSesion();
+  const { setMode } = useTheme();
+  const define = usuario?.rol === "administrador" || usuario?.ambito === "soporte";
   const [ajustes, setAjustes] = useState<AjustesTenant | null>(null);
   const [clave, setClave] = useState("");
   const [error, setError] = useState("");
@@ -83,6 +100,8 @@ export function Ajustes() {
       {cargando ? <Cargando /> : null}
       {!cargando && ajustes ? (
         <div className="space-y-4">
+          {define ? <Organizacion ajustes={ajustes} alGuardar={(siguiente) => { setAjustes(siguiente); setMode(siguiente.tema); }} /> : null}
+          {define ? <PlanTenant ajustes={ajustes} alGuardar={setAjustes} /> : null}
           <Card>
             <form onSubmit={guardar} className="max-w-lg space-y-4">
               <Input
@@ -126,6 +145,112 @@ export function Ajustes() {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function Organizacion({ ajustes, alGuardar }: { ajustes: AjustesTenant; alGuardar: (ajustes: AjustesTenant) => void }) {
+  const [nombre, setNombre] = useState(ajustes.nombre);
+  const [tema, setTema] = useState(ajustes.tema);
+  const [razonSocial, setRazonSocial] = useState(ajustes.razonSocial);
+  const [rut, setRut] = useState(ajustes.rut);
+  const [giro, setGiro] = useState(ajustes.giro);
+  const [direccion, setDireccion] = useState(ajustes.direccion);
+  const [correo, setCorreo] = useState(ajustes.correo);
+  const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
+
+  async function guardar(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    setMensaje("");
+    try {
+      const siguiente = await api<AjustesTenant>("/v1/ajustes/organizacion", {
+        method: "PUT",
+        body: JSON.stringify({ nombre, tema, razonSocial, rut, giro, direccion, correo }),
+      });
+      alGuardar(siguiente);
+      setMensaje("Ajustes de la organización guardados.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron guardar los ajustes");
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-lg font-semibold text-ink">Organización</h2>
+      <p className="mt-1 text-sm text-muted">El tema claro u oscuro se usa en el panel y en los correos de esta organización.</p>
+      <form onSubmit={guardar} className="mt-4 grid max-w-3xl gap-4 md:grid-cols-2">
+        <Input label="Nombre" value={nombre} onChange={(evento) => setNombre(evento.target.value)} required />
+        <Select label="Tema" value={tema} onChange={(evento) => setTema(evento.target.value === "dark" ? "dark" : "light")}>
+          <option value="light">Claro</option>
+          <option value="dark">Oscuro</option>
+        </Select>
+        <Input label="Razón social" value={razonSocial} onChange={(evento) => setRazonSocial(evento.target.value)} />
+        <Input label="RUT" value={rut} onChange={(evento) => setRut(evento.target.value)} />
+        <Input label="Giro" value={giro} onChange={(evento) => setGiro(evento.target.value)} />
+        <Input label="Correo de facturación" type="email" value={correo} onChange={(evento) => setCorreo(evento.target.value)} />
+        <div className="md:col-span-2">
+          <Input label="Dirección" value={direccion} onChange={(evento) => setDireccion(evento.target.value)} />
+        </div>
+        <div className="md:col-span-2">
+          <Button type="submit">Guardar organización</Button>
+        </div>
+      </form>
+      {mensaje ? <div className="mt-4"><Alert type="success" message={mensaje} onClose={() => setMensaje("")} /></div> : null}
+      {error ? <div className="mt-4"><Alert message={error} onClose={() => setError("")} /></div> : null}
+    </Card>
+  );
+}
+
+function PlanTenant({ ajustes, alGuardar }: { ajustes: AjustesTenant; alGuardar: (ajustes: AjustesTenant) => void }) {
+  const [planId, setPlanId] = useState(ajustes.planId ?? "");
+  const [modo, setModo] = useState(ajustes.modo === "prepago" ? "prepago" : "postpago");
+  const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const actual = ajustes.planes.find((plan) => plan.id === ajustes.planId);
+
+  async function guardar(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    setMensaje("");
+    try {
+      const siguiente = await api<AjustesTenant>("/v1/ajustes/plan", {
+        method: "PUT",
+        body: JSON.stringify({ planId, modo }),
+      });
+      alGuardar(siguiente);
+      setMensaje("Plan actualizado.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar el plan");
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-lg font-semibold text-ink">Plan</h2>
+      <p className="mt-1 text-sm text-muted">
+        Ahora: {actual ? `${actual.nombre}, ${actual.asientos} asientos, ${actual.precio} USD` : "sin plan"}.
+        Un plan de pago empieza el periodo de 30 días. Si la plataforma emite factura, guarda el RUT antes.
+      </p>
+      <form onSubmit={guardar} className="mt-4 grid max-w-3xl gap-4 md:grid-cols-2">
+        <Select label="Plan" value={planId} onChange={(evento) => setPlanId(evento.target.value)}>
+          {ajustes.planes.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {plan.nombre} · {plan.asientos} asientos · {plan.demo ? "demo" : `${plan.precio} USD`}
+            </option>
+          ))}
+        </Select>
+        <Select label="Modo" value={modo} onChange={(evento) => setModo(evento.target.value)}>
+          <option value="postpago">Postpago</option>
+          <option value="prepago">Prepago</option>
+        </Select>
+        <div className="md:col-span-2">
+          <Button type="submit">Usar este plan</Button>
+        </div>
+      </form>
+      {mensaje ? <div className="mt-4"><Alert type="success" message={mensaje} onClose={() => setMensaje("")} /></div> : null}
+      {error ? <div className="mt-4"><Alert message={error} onClose={() => setError("")} /></div> : null}
+    </Card>
   );
 }
 

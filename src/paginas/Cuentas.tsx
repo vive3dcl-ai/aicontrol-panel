@@ -11,6 +11,7 @@ const rolesTenant = [
   ["analista", "Analista"],
   ["operador", "Operador"],
   ["responsable_seguridad", "Responsable de seguridad"],
+  ["administrador", "Admin"],
 ] as const;
 
 const rolesAdmin = [["admin", "Admin"]] as const;
@@ -45,7 +46,10 @@ export function Cuentas() {
 
   const rolesPlataforma = esSuperadmin ? rolesSuperadmin : rolesAdmin;
   const viendoTenant = esPlataforma && ver !== "plataforma";
-  const opciones = esPlataforma && !viendoTenant ? rolesPlataforma : rolesTenant;
+  const rolesOrganizacion = esPlataforma || usuario?.rol === "administrador"
+    ? rolesTenant
+    : rolesTenant.filter(([rol]) => rol !== "administrador");
+  const opciones = esPlataforma && !viendoTenant ? rolesPlataforma : rolesOrganizacion;
 
   async function crear(evento: React.FormEvent) {
     evento.preventDefault();
@@ -127,7 +131,7 @@ export function Cuentas() {
   }
 
   function opcionesDe(cuenta: Usuario) {
-    if (cuenta.tenantId) return rolesTenant;
+    if (cuenta.tenantId) return rolesOrganizacion;
     return rolesPlataforma;
   }
 

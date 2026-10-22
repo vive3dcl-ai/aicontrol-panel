@@ -43,7 +43,7 @@ export function Politicas() {
   const [modoWeb, setModoWeb] = useState<"aceptar" | "bloquear" | null>(null);
   const [modoPendiente, setModoPendiente] = useState<"aceptar" | "bloquear" | null>(null);
   const [confirmaModo, setConfirmaModo] = useState(false);
-  const puede = usuario?.rol === "responsable_seguridad" || usuario?.ambito === "soporte";
+  const puede = usuario?.rol === "administrador" || usuario?.rol === "responsable_seguridad" || usuario?.ambito === "soporte";
   const lista = useListado(
     datos?.politicas ?? [],
     (politica) => `${politica.nombre} ${politica.accion} ${politica.alcance} ${politica.proveedor ?? ""} ${politica.endpoint ?? ""} ${politica.destino} ${politica.sujeto ?? ""}`,

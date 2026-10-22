@@ -32,7 +32,7 @@ export function Facturacion() {
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
-  const puedePagar = usuario?.rol === "responsable_seguridad";
+  const puedePagar = usuario?.rol === "administrador" || usuario?.rol === "responsable_seguridad";
 
   function cargar() {
     api<Respuesta>("/v1/facturacion")

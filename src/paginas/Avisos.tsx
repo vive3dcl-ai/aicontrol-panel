@@ -13,7 +13,7 @@ export function Avisos() {
   const [cuerpo, setCuerpo] = useState("");
   const [aviso, setAviso] = useState("");
   const [mensaje, setMensaje] = useState("");
-  const puede = usuario?.rol === "responsable_seguridad" || usuario?.ambito === "soporte";
+  const puede = usuario?.rol === "administrador" || usuario?.rol === "responsable_seguridad" || usuario?.ambito === "soporte";
 
   async function publicar(evento: React.FormEvent) {
     evento.preventDefault();

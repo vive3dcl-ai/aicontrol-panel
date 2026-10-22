@@ -79,7 +79,7 @@ export function Flota() {
   const [errorQuitar, setErrorQuitar] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [sistema, setSistema] = useState<"todos" | "windows" | "linux" | "mac">("todos");
-  const puedeReenrolar = usuario?.rol === "superadmin" || usuario?.rol === "admin" || usuario?.rol === "responsable_seguridad" || usuario?.rol === "operador";
+  const puedeReenrolar = usuario?.rol === "superadmin" || usuario?.rol === "admin" || usuario?.rol === "administrador" || usuario?.rol === "responsable_seguridad" || usuario?.rol === "operador";
   const flotaGlobal = usuario?.ambito === "plataforma";
   const equipos = useMemo(() => {
     const lista = [...(datos?.dispositivos ?? [])];

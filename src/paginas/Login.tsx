@@ -5,6 +5,7 @@ import { useMarca } from "../marca";
 import { destinoInicio, useSesion } from "../sesion";
 import { Alert, Button, Card, Input, Marca } from "../componentes/ui";
 import { cuentaLocalInicial, cuentasLocales, type CuentaLocal } from "../local";
+import { slugDeNombre } from "../slug";
 
 export function LoginCliente() {
   return <Acceso ambito="cliente" subtitulo="Inicia sesión en tu cuenta" />;
@@ -42,7 +43,12 @@ function Acceso({
   const [clave, setClave] = useState(inicial.clave);
   const [codigo, setCodigo] = useState("");
   const [claveNueva, setClaveNueva] = useState("");
-  const [paso, setPaso] = useState<"clave" | "mfa" | "recuperar" | "nueva">("clave");
+  const [paso, setPaso] = useState<"clave" | "mfa" | "recuperar" | "nueva" | "registro">("clave");
+  const [organizacion, setOrganizacion] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTocado, setSlugTocado] = useState(false);
+  const [nombrePersona, setNombrePersona] = useState("");
+  const [claveRegistro, setClaveRegistro] = useState("");
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
   const [cargando, setCargando] = useState(false);
@@ -125,9 +131,16 @@ function Acceso({
               {cargando ? "Entrando..." : "Entrar"}
             </Button>
             {paso === "clave" ? (
-              <button type="button" className="w-full text-center text-sm text-muted hover:text-ink" onClick={() => { setError(""); setPaso("recuperar"); }}>
-                Recuperar contraseña
-              </button>
+              <div className="space-y-2 text-center">
+                <button type="button" className="w-full text-sm text-muted hover:text-ink" onClick={() => { setError(""); setPaso("recuperar"); }}>
+                  Recuperar contraseña
+                </button>
+                {ambito === "cliente" ? (
+                  <button type="button" className="w-full text-sm text-ink hover:underline" onClick={() => { setError(""); setAviso(""); setPaso("registro"); }}>
+                    Crear una organización
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </form>
         ) : null}
@@ -136,6 +149,43 @@ function Acceso({
             {error ? <Alert message={error} /> : null}
             <Input label="Email" type="email" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
             <Button type="submit" disabled={cargando} className="w-full">{cargando ? "Enviando..." : "Enviar código"}</Button>
+            <button type="button" className="w-full text-center text-sm text-muted hover:text-ink" onClick={() => setPaso("clave")}>Volver</button>
+          </form>
+        ) : null}
+        {paso === "registro" ? (
+          <form
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              setError("");
+              if (claveRegistro.length < 8) {
+                setError("La clave tiene que tener al menos 8 caracteres");
+                return;
+              }
+              setCargando(true);
+              void api("/v1/registro", {
+                method: "POST",
+                body: JSON.stringify({
+                  nombre: organizacion.trim(),
+                  slug: slug.trim().toLowerCase(),
+                  correo: correo.trim(),
+                  ...(nombrePersona.trim() ? { nombreAdmin: nombrePersona.trim() } : {}),
+                  clave: claveRegistro,
+                }),
+              })
+                .then(() => entrar(correo.trim(), claveRegistro))
+                .catch((err: unknown) => setError(err instanceof Error ? err.message : "No se pudo crear la organización"))
+                .finally(() => setCargando(false));
+            }}
+            className="mt-6 space-y-4"
+          >
+            {error ? <Alert message={error} /> : null}
+            <Input label="Organización" value={organizacion} onChange={(evento) => { setOrganizacion(evento.target.value); if (!slugTocado) setSlug(slugDeNombre(evento.target.value)); }} required />
+            <Input label="Slug" value={slug} onChange={(evento) => { setSlugTocado(true); setSlug(evento.target.value); }} required autoComplete="off" />
+            <Input label="Tu nombre" value={nombrePersona} onChange={(evento) => setNombrePersona(evento.target.value)} />
+            <Input label="Email" type="email" value={correo} onChange={(evento) => setCorreo(evento.target.value)} required />
+            <Input label="Contraseña" type="password" autoComplete="new-password" minLength={8} value={claveRegistro} onChange={(evento) => setClaveRegistro(evento.target.value)} required />
+            <p className="text-sm text-muted">La organización entra al plan demo. El plan se cambia después, en Ajustes.</p>
+            <Button type="submit" disabled={cargando} className="w-full">{cargando ? "Creando..." : "Crear organización"}</Button>
             <button type="button" className="w-full text-center text-sm text-muted hover:text-ink" onClick={() => setPaso("clave")}>Volver</button>
           </form>
         ) : null}

@@ -18,6 +18,7 @@ export type Usuario = {
   debeCambiarClave?: boolean;
   mfaActivo?: boolean;
   servicioSuspendido?: boolean;
+  tema?: "light" | "dark" | null;
 };
 
 type Sesion = {
@@ -105,6 +106,7 @@ export function useSesion() {
 export function etiquetaRol(rol: string, ambito?: string) {
   if (ambito === "soporte") return "Soporte";
   const nombres: Record<string, string> = {
+    administrador: "Admin",
     responsable_seguridad: "Responsable de seguridad",
     analista: "Analista",
     operador: "Operador",
@@ -164,7 +166,7 @@ export function navegacion(rol: string) {
   if (rol !== "operador") items.push({ to: "/politicas", label: "Políticas" });
   items.push({ to: "/notificaciones", label: "Notificaciones" });
   items.push({ to: "/avisos", label: "Avisos" });
-  if (rol === "responsable_seguridad") {
+  if (rol === "responsable_seguridad" || rol === "administrador") {
     items.push({ to: "/usuarios", label: "Usuarios" });
     items.push({ to: "/grupos", label: "Grupos" });
     items.push({ to: "/base-ia", label: "Base de IA" });
@@ -175,5 +177,5 @@ export function navegacion(rol: string) {
 }
 
 export function puedeGestionarCuentas(rol: string) {
-  return esRolPlataforma(rol) || rol === "responsable_seguridad";
+  return esRolPlataforma(rol) || rol === "responsable_seguridad" || rol === "administrador";
 }

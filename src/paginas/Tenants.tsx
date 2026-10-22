@@ -3,9 +3,34 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLista } from "../datos";
 import { useSesion } from "../sesion";
-import { Alert, Button, Cargando, Input, Modal, PageHeader, Table } from "../componentes/ui";
+import { Alert, Button, Cargando, Input, Modal, PageHeader, Select, Table } from "../componentes/ui";
 
-type Tenant = { id: string; nombre: string; slug: string };
+type Tenant = {
+  id: string;
+  nombre: string;
+  slug: string;
+  plan?: string | null;
+  asientos?: number | null;
+  asientosUsados?: number | null;
+  modo?: string;
+  habilitadoEn?: string | null;
+  servicioSuspendido?: boolean;
+};
+
+type Plan = { id: string; nombre: string; demo: boolean };
+type Cobro = {
+  planId: string | null;
+  modo: string;
+  prorrogaHasta: string | null;
+  razonSocial: string;
+  rut: string;
+  giro: string;
+  direccion: string;
+  correo: string;
+  asientos: number | null;
+  asientosUsados: number;
+  habilitadoEn: string | null;
+};
 
 export function Tenants() {
   const { usuario, entrarSoporte } = useSesion();
@@ -17,6 +42,8 @@ export function Tenants() {
   const [slug, setSlug] = useState("");
   const [editando, setEditando] = useState<Tenant | null>(null);
   const [nombreEdit, setNombreEdit] = useState("");
+  const [cobro, setCobro] = useState<Cobro | null>(null);
+  const [planes, setPlanes] = useState<Plan[]>([]);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -35,6 +62,48 @@ export function Tenants() {
       lista.recargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el tenant");
+    }
+  }
+
+  async function abrirCobro(tenant: Tenant) {
+    setError("");
+    try {
+      const [detalle, catalogo] = await Promise.all([
+        api<{ cobro: Cobro }>(`/v1/tenants/${tenant.id}/cobro`),
+        api<{ planes: Plan[] }>("/v1/planes"),
+      ]);
+      setCobro({ ...detalle.cobro, planId: detalle.cobro.planId });
+      setPlanes(catalogo.planes);
+      setEditando(tenant);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo leer el cobro");
+    }
+  }
+
+  async function guardarCobro(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!editando || !cobro) return;
+    setError("");
+    try {
+      await api(`/v1/tenants/${editando.id}/cobro`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          planId: cobro.planId,
+          modo: cobro.modo,
+          prorrogaHasta: cobro.prorrogaHasta ? cobro.prorrogaHasta.slice(0, 10) : "",
+          razonSocial: cobro.razonSocial,
+          rut: cobro.rut,
+          giro: cobro.giro,
+          direccion: cobro.direccion,
+          correo: cobro.correo,
+        }),
+      });
+      setEditando(null);
+      setCobro(null);
+      setMensaje("Cobro del tenant actualizado.");
+      lista.recargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el cobro");
     }
   }
 
@@ -68,13 +137,16 @@ export function Tenants() {
       {lista.cargando ? <Cargando /> : null}
       {!lista.cargando && lista.datos?.tenants.length === 0 ? <p className="text-sm text-muted">No hay tenants.</p> : null}
       {lista.datos && lista.datos.tenants.length > 0 ? (
-        <Table headers={["Nombre", "Slug", ""]}>
+        <Table headers={["Nombre", "Slug", "Plan", "Asientos", "Acciones"]}>
           {lista.datos.tenants.map((tenant) => (
             <tr key={tenant.id}>
               <td className="px-4 py-3 font-medium text-ink">{tenant.nombre}</td>
               <td className="px-4 py-3 text-muted">{tenant.slug}</td>
+              <td className="px-4 py-3 text-ink">{tenant.plan ?? "—"}{tenant.servicioSuspendido ? " · suspendido" : ""}</td>
+              <td className="px-4 py-3 text-ink">{tenant.asientosUsados ?? 0} de {tenant.asientos ?? "—"}</td>
               <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">
+                  <Button variant="secondary" onClick={() => void abrirCobro(tenant)}>Cobro</Button>
                   {puedeEntrar ? (
                     <Button
                       onClick={() => {
@@ -93,6 +165,7 @@ export function Tenants() {
                     variant="secondary"
                     onClick={() => {
                       setError("");
+                      setCobro(null);
                       setEditando(tenant);
                       setNombreEdit(tenant.nombre);
                     }}
@@ -126,19 +199,40 @@ export function Tenants() {
 
       <Modal
         open={Boolean(editando)}
-        onClose={() => setEditando(null)}
-        title="Editar tenant"
+        onClose={() => { setEditando(null); setCobro(null); }}
+        title={cobro ? "Cobro del tenant" : "Editar tenant"}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setEditando(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => { setEditando(null); setCobro(null); }}>Cancelar</Button>
             <Button type="submit" form="form-tenant-edit">Guardar</Button>
           </div>
         }
       >
-        <form id="form-tenant-edit" onSubmit={renombrar} className="space-y-4">
+        <form id="form-tenant-edit" onSubmit={cobro ? guardarCobro : renombrar} className="space-y-4">
           {error && editando ? <Alert inline message={error} /> : null}
-          <Input label="Nombre" value={nombreEdit} onChange={(evento) => setNombreEdit(evento.target.value)} required />
-          <p className="text-sm text-muted">Slug: {editando?.slug}</p>
+          {cobro ? (
+            <>
+              <p className="text-sm text-muted">{editando?.nombre}. {cobro.asientosUsados} de {cobro.asientos ?? "—"} asientos.{cobro.habilitadoEn ? ` Habilitado ${cobro.habilitadoEn.slice(0, 10)}.` : ""}</p>
+              <Select label="Plan" value={cobro.planId ?? ""} onChange={(evento) => setCobro({ ...cobro, planId: evento.target.value })}>
+                {planes.map((plan) => <option key={plan.id} value={plan.id}>{plan.nombre}{plan.demo ? " (demo)" : ""}</option>)}
+              </Select>
+              <Select label="Modo" value={cobro.modo} onChange={(evento) => setCobro({ ...cobro, modo: evento.target.value })}>
+                <option value="postpago">Postpago</option>
+                <option value="prepago">Prepago</option>
+              </Select>
+              <Input label="Prórroga hasta" type="date" value={cobro.prorrogaHasta?.slice(0, 10) ?? ""} onChange={(evento) => setCobro({ ...cobro, prorrogaHasta: evento.target.value || null })} />
+              <Input label="Razón social" value={cobro.razonSocial} onChange={(evento) => setCobro({ ...cobro, razonSocial: evento.target.value })} />
+              <Input label="RUT" value={cobro.rut} onChange={(evento) => setCobro({ ...cobro, rut: evento.target.value })} />
+              <Input label="Giro" value={cobro.giro} onChange={(evento) => setCobro({ ...cobro, giro: evento.target.value })} />
+              <Input label="Dirección" value={cobro.direccion} onChange={(evento) => setCobro({ ...cobro, direccion: evento.target.value })} />
+              <Input label="Correo de facturación" type="email" value={cobro.correo} onChange={(evento) => setCobro({ ...cobro, correo: evento.target.value })} />
+            </>
+          ) : (
+            <>
+              <Input label="Nombre" value={nombreEdit} onChange={(evento) => setNombreEdit(evento.target.value)} required />
+              <p className="text-sm text-muted">Slug: {editando?.slug}</p>
+            </>
+          )}
         </form>
       </Modal>
     </section>

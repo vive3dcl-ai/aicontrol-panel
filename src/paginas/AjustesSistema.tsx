@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { guardarMarca } from "../marca";
-import { Alert, Button, Cargando, Input, PageHeader } from "../componentes/ui";
+import { Alert, Button, Cargando, Input, PageHeader, Select } from "../componentes/ui";
 
 type Ajustes = { nombre: string; sigla: string; hostPanel: string; hostAgentes: string };
+type Documento = { tipo: "factura" | "boleta"; iva: number };
 type Correo = { host: string; puerto: number; usuario: string; desde: string; nombre: string; seguro: boolean; claveGuardada: boolean };
 
 export function AjustesSistema() {
@@ -14,6 +15,7 @@ export function AjustesSistema() {
   const [correo, setCorreo] = useState<Correo | null>(null);
   const [claveSmtp, setClaveSmtp] = useState("");
   const [destinoPrueba, setDestinoPrueba] = useState("");
+  const [documento, setDocumento] = useState<Documento | null>(null);
 
   useEffect(() => {
     api<Ajustes>("/v1/plataforma/ajustes")
@@ -22,6 +24,9 @@ export function AjustesSistema() {
     api<Correo>("/v1/plataforma/correo")
       .then(setCorreo)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "No se pudo leer el correo"));
+    api<Documento>("/v1/plataforma/documento")
+      .then(setDocumento)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "No se pudo leer el documento"));
   }, []);
 
   async function guardar(evento: React.FormEvent) {
@@ -57,6 +62,30 @@ export function AjustesSistema() {
           <Input label="Host del panel" value={ajustes.hostPanel} onChange={(evento) => setAjustes({ ...ajustes, hostPanel: evento.target.value })} required />
           <Input label="Host de los agentes" value={ajustes.hostAgentes} onChange={(evento) => setAjustes({ ...ajustes, hostAgentes: evento.target.value })} required />
           <Button type="submit" disabled={guardando}>{guardando ? "Guardando..." : "Guardar"}</Button>
+        </form>
+      ) : null}
+      {documento ? (
+        <form
+          className="mt-6 max-w-xl space-y-4 rounded-md border border-line bg-surface p-4 sm:p-5"
+          onSubmit={async (evento) => {
+            evento.preventDefault();
+            setError("");
+            try {
+              setDocumento(await api<Documento>("/v1/plataforma/documento", { method: "PUT", body: JSON.stringify(documento) }));
+              setMensaje("Documento de cobro guardado.");
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "No se pudo guardar el documento");
+            }
+          }}
+        >
+          <h2 className="text-base font-semibold text-ink">Documento de cobro</h2>
+          <Select label="Tipo" value={documento.tipo} onChange={(evento) => setDocumento({ ...documento, tipo: evento.target.value === "factura" ? "factura" : "boleta" })}>
+            <option value="boleta">Boleta</option>
+            <option value="factura">Factura</option>
+          </Select>
+          <Input label="IVA %" type="number" min={0} max={100} value={documento.iva} onChange={(evento) => setDocumento({ ...documento, iva: Number(evento.target.value) })} required />
+          <p className="text-sm text-muted">El cliente ve el subtotal, el IVA y el total en dólares. Si el tipo es factura, el tenant necesita RUT.</p>
+          <Button type="submit">Guardar documento</Button>
         </form>
       ) : null}
       {correo ? <CorreoSmtp correo={correo} clave={claveSmtp} destino={destinoPrueba} onCorreo={setCorreo} onClave={setClaveSmtp} onDestino={setDestinoPrueba} onError={setError} onMensaje={setMensaje} /> : null}

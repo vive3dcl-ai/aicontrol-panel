@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { fecha, useLista } from "../datos";
 import { useSesion } from "../sesion";
@@ -43,6 +43,11 @@ const estados: Record<string, string> = {
   reenrolamiento_pendiente: "Reenrolamiento pedido",
 };
 
+function familiaSistema(sistema: string) {
+  if (sistema === "darwin" || sistema === "macos") return "mac";
+  return sistema;
+}
+
 function ram(mb: number) {
   if (mb >= 1024 && mb % 1024 === 0) return `${mb / 1024} GB`;
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
@@ -72,8 +77,30 @@ export function Flota() {
   const [suma, setSuma] = useState({ a: 4, b: 7 });
   const [respuesta, setRespuesta] = useState("");
   const [errorQuitar, setErrorQuitar] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [sistema, setSistema] = useState<"todos" | "windows" | "linux" | "mac">("todos");
   const puedeReenrolar = usuario?.rol === "superadmin" || usuario?.rol === "admin" || usuario?.rol === "responsable_seguridad" || usuario?.rol === "operador";
   const flotaGlobal = usuario?.ambito === "plataforma";
+  const equipos = useMemo(() => {
+    const lista = [...(datos?.dispositivos ?? [])];
+    lista.sort((a, b) => {
+      if (flotaGlobal) {
+        const organizacion = (a.organizacion ?? "").localeCompare(b.organizacion ?? "", "es", { sensitivity: "base" });
+        if (organizacion !== 0) return organizacion;
+      }
+      return a.hostname.localeCompare(b.hostname, "es", { sensitivity: "base", numeric: true });
+    });
+    const consulta = busqueda.trim().toLowerCase();
+    return lista.filter((equipo) => {
+      if (sistema !== "todos" && familiaSistema(equipo.sistema) !== sistema) return false;
+      if (!consulta) return true;
+      const texto = [equipo.hostname, equipo.usuarioSesion, equipo.cuenta?.nombre, equipo.cuenta?.correo, equipo.machineId, equipo.organizacion]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return texto.includes(consulta);
+    });
+  }, [datos?.dispositivos, busqueda, sistema, flotaGlobal]);
 
   function abrirQuitar(equipo: Dispositivo) {
     setQuitar(equipo);
@@ -141,14 +168,42 @@ export function Flota() {
           </div>
         </Card>
       ) : null}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="block min-w-0 flex-1 space-y-1.5">
+          <span className="text-sm font-medium text-muted">Buscar</span>
+          <input
+            value={busqueda}
+            onChange={(evento) => setBusqueda(evento.target.value)}
+            placeholder="Equipo, usuario, cuenta o identidad"
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {([
+            ["todos", "Todos"],
+            ["windows", "Windows"],
+            ["linux", "Linux"],
+            ["mac", "Mac"],
+          ] as const).map(([valor, etiqueta]) => (
+            <Button key={valor} variant={sistema === valor ? "primary" : "secondary"} onClick={() => setSistema(valor)}>
+              {etiqueta}
+            </Button>
+          ))}
+        </div>
+      </div>
       {cargando ? <Cargando texto="Cargando equipos..." /> : null}
       {!cargando && datos?.dispositivos.length === 0 ? (
         <Card>
           <p className="text-sm text-muted">No hay equipos con cuenta enlazada.</p>
         </Card>
       ) : null}
+      {!cargando && datos && datos.dispositivos.length > 0 && equipos.length === 0 ? (
+        <Card>
+          <p className="text-sm text-muted">Ningún equipo coincide con el filtro.</p>
+        </Card>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {datos?.dispositivos.map((equipo) => (
+        {equipos.map((equipo) => (
           <Card key={equipo.id}>
             <div className="flex items-start justify-between gap-3">
               <div>

@@ -20,6 +20,10 @@ import { Cluster } from "./paginas/Cluster";
 import { AjustesSistema } from "./paginas/AjustesSistema";
 import { Registros } from "./paginas/Registros";
 import { Actualizadores } from "./paginas/Actualizadores";
+import { Planes } from "./paginas/Planes";
+import { Pagos } from "./paginas/Pagos";
+import { MetodosPago } from "./paginas/MetodosPago";
+import { Facturacion } from "./paginas/Facturacion";
 
 function destinoSinSesion() {
   return sessionStorage.getItem("gobernanza-puerta") || "/login";
@@ -33,6 +37,9 @@ function Privado({ children, roles }: { children: React.ReactNode; roles?: strin
   }
   if (!usuario) return <Navigate to={destinoSinSesion()} replace />;
   if (usuario.debeCambiarClave && ubicacion.pathname !== "/cuenta") return <Navigate to="/cuenta" replace />;
+  if (usuario.servicioSuspendido && ubicacion.pathname !== "/facturacion" && ubicacion.pathname !== "/cuenta") {
+    return <Navigate to="/facturacion" replace />;
+  }
   if (roles && !roles.includes(usuario.rol)) return <Navigate to={destinoInicio(usuario.rol)} replace />;
   return <Shell>{children}</Shell>;
 }
@@ -59,6 +66,10 @@ export default function App() {
       <Route path="/admin/ajustes" element={<Privado roles={["superadmin", "admin"]}><AjustesSistema /></Privado>} />
       <Route path="/admin/registros" element={<Privado roles={["superadmin", "admin"]}><Registros /></Privado>} />
       <Route path="/admin/actualizadores" element={<Privado roles={["superadmin", "admin"]}><Actualizadores /></Privado>} />
+      <Route path="/admin/planes" element={<Privado roles={["superadmin", "admin"]}><Planes /></Privado>} />
+      <Route path="/admin/pagos" element={<Privado roles={["superadmin", "admin"]}><Pagos /></Privado>} />
+      <Route path="/admin/medios" element={<Privado roles={["superadmin", "admin"]}><MetodosPago /></Privado>} />
+      <Route path="/facturacion" element={<Privado roles={["responsable_seguridad", "analista", "operador", "user"]}><Facturacion /></Privado>} />
       <Route path="/flota" element={<Privado roles={["superadmin", "admin", "responsable_seguridad", "analista", "operador"]}><Flota /></Privado>} />
       <Route path="/actividad" element={<Privado roles={["responsable_seguridad", "analista", "operador"]}><Actividad /></Privado>} />
       <Route path="/politicas" element={<Privado roles={["responsable_seguridad", "analista"]}><Politicas /></Privado>} />

@@ -17,6 +17,7 @@ export type Usuario = {
   grupos?: { id: string; nombre: string }[];
   debeCambiarClave?: boolean;
   mfaActivo?: boolean;
+  servicioSuspendido?: boolean;
 };
 
 type Sesion = {
@@ -140,6 +141,9 @@ export function navegacion(rol: string) {
       { to: "/admin/base-ia", label: "Base de IA" },
       { to: "/admin/ajustes", label: "Ajustes" },
       { to: "/admin/actualizadores", label: "Actualizadores" },
+      { to: "/admin/planes", label: "Planes" },
+      { to: "/admin/pagos", label: "Pagos" },
+      { to: "/admin/medios", label: "Métodos de pago" },
       { to: "/admin/registros", label: "Registros" },
       { to: "/flota", label: "Flota" },
       { to: "/usuarios", label: "Usuarios" },
@@ -149,10 +153,12 @@ export function navegacion(rol: string) {
     return [
       { to: "/inicio", label: "Inicio", end: true },
       { to: "/avisos", label: "Avisos" },
+      { to: "/facturacion", label: "Facturación" },
     ];
   }
   const items: { to: string; label: string; end?: boolean }[] = [
     { to: "/flota", label: "Flota" },
+    { to: "/facturacion", label: "Facturación" },
     { to: "/actividad", label: "Actividad" },
   ];
   if (rol !== "operador") items.push({ to: "/politicas", label: "Políticas" });

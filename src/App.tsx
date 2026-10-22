@@ -16,6 +16,9 @@ import { Tenants } from "./paginas/Tenants";
 import { Inicio } from "./paginas/Inicio";
 import { Cuenta } from "./paginas/Cuenta";
 import { Actualizaciones } from "./paginas/Actualizaciones";
+import { Cluster } from "./paginas/Cluster";
+import { AjustesSistema } from "./paginas/AjustesSistema";
+import { Registros } from "./paginas/Registros";
 
 function destinoSinSesion() {
   return sessionStorage.getItem("gobernanza-puerta") || "/login";
@@ -48,6 +51,10 @@ export default function App() {
       <Route path="/inicio" element={<Privado roles={["user"]}><Inicio /></Privado>} />
       <Route path="/cuenta" element={<Privado><Cuenta /></Privado>} />
       <Route path="/admin/tenants" element={<Privado roles={["superadmin", "admin"]}><Tenants /></Privado>} />
+      <Route path="/admin/cluster" element={<Privado roles={["superadmin", "admin"]}><Cluster /></Privado>} />
+      <Route path="/admin/base-ia" element={<Privado roles={["superadmin", "admin"]}><BaseIa ambito="plataforma" /></Privado>} />
+      <Route path="/admin/ajustes" element={<Privado roles={["superadmin", "admin"]}><AjustesSistema /></Privado>} />
+      <Route path="/admin/registros" element={<Privado roles={["superadmin", "admin"]}><Registros /></Privado>} />
       <Route path="/flota" element={<Privado roles={["superadmin", "admin", "responsable_seguridad", "analista", "operador"]}><Flota /></Privado>} />
       <Route path="/actividad" element={<Privado roles={["responsable_seguridad", "analista", "operador"]}><Actividad /></Privado>} />
       <Route path="/politicas" element={<Privado roles={["responsable_seguridad", "analista"]}><Politicas /></Privado>} />

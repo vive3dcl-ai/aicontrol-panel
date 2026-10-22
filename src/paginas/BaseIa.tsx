@@ -47,14 +47,17 @@ function resumenReceta(receta: Receta) {
   return partes.length ? partes.join(" · ") : "Todo el host";
 }
 
-export function BaseIa() {
-  const catalogo = useLista<{ proveedores: Proveedor[] }>("/v1/catalogo");
+export function BaseIa({ ambito = "tenant" }: { ambito?: "plataforma" | "tenant" }) {
+  const plataforma = ambito === "plataforma";
+  const catalogo = useLista<{ proveedores: Proveedor[] }>(plataforma ? "/v1/plataforma/catalogo" : "/v1/catalogo");
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [editando, setEditando] = useState<Fila | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(formularioDe());
   const [alta, setAlta] = useState(false);
   const [proveedorNuevo, setProveedorNuevo] = useState("");
+  const [nombreProveedor, setNombreProveedor] = useState("");
+  const [altaProveedor, setAltaProveedor] = useState(false);
   const [pestaña, setPestaña] = useState<"tradicionales" | "shadow">("tradicionales");
   const filas = useMemo(
     () => (catalogo.datos?.proveedores ?? []).flatMap((proveedor) => proveedor.endpoints.map((endpoint) => ({
@@ -85,9 +88,12 @@ export function BaseIa() {
     if (!editando) return;
     setError("");
     try {
-      await api(`/v1/catalogo/endpoints/${editando.id}`, { method: "PUT", body: JSON.stringify(formulario) });
+      const ruta = plataforma ? `/v1/plataforma/catalogo/endpoints/${editando.id}` : `/v1/catalogo/endpoints/${editando.id}`;
+      await api(ruta, { method: "PUT", body: JSON.stringify(formulario) });
       setEditando(null);
-      setMensaje("Fórmula de detección actualizada. Los agentes la recibirán en el siguiente heartbeat.");
+      setMensaje(plataforma
+        ? "Fórmula publicada. Los tenants la reciben en su catálogo y los agentes en el siguiente heartbeat."
+        : "Fórmula de detección actualizada. Los agentes la recibirán en el siguiente heartbeat.");
       catalogo.recargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la fórmula");
@@ -98,11 +104,14 @@ export function BaseIa() {
     evento.preventDefault();
     setError("");
     try {
-      await api(`/v1/catalogo/proveedores/${proveedorNuevo}/endpoints`, { method: "POST", body: JSON.stringify(formulario) });
+      const ruta = plataforma
+        ? `/v1/plataforma/catalogo/proveedores/${proveedorNuevo}/endpoints`
+        : `/v1/catalogo/proveedores/${proveedorNuevo}/endpoints`;
+      await api(ruta, { method: "POST", body: JSON.stringify(formulario) });
       setAlta(false);
       setProveedorNuevo("");
       setFormulario(formularioDe());
-      setMensaje("Endpoint y fórmula agregados.");
+      setMensaje(plataforma ? "Endpoint publicado para todos los tenants." : "Endpoint y fórmula agregados.");
       catalogo.recargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo agregar el endpoint");
@@ -123,11 +132,26 @@ export function BaseIa() {
   async function quitar(fila: Fila) {
     setError("");
     try {
-      await api(`/v1/catalogo/endpoints/${fila.id}`, { method: "DELETE" });
-      setMensaje("Endpoint quitado.");
+      const ruta = plataforma ? `/v1/plataforma/catalogo/endpoints/${fila.id}` : `/v1/catalogo/endpoints/${fila.id}`;
+      await api(ruta, { method: "DELETE" });
+      setMensaje(plataforma ? "Endpoint quitado de la base publicada." : "Endpoint quitado.");
       catalogo.recargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo quitar el endpoint");
+    }
+  }
+
+  async function crearProveedor(evento: React.FormEvent) {
+    evento.preventDefault();
+    setError("");
+    try {
+      await api("/v1/plataforma/catalogo/proveedores", { method: "POST", body: JSON.stringify({ nombre: nombreProveedor.trim() }) });
+      setAltaProveedor(false);
+      setNombreProveedor("");
+      setMensaje("Proveedor publicado. Ya se puede agregar un endpoint.");
+      catalogo.recargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear el proveedor");
     }
   }
 
@@ -135,15 +159,24 @@ export function BaseIa() {
     <section>
       <PageHeader
         title="Base de IA"
-        subtitle={pestaña === "shadow"
-          ? "Dominios del feed dinámico que todavía no se adoptaron. Adoptar los pasa a tradicionales para una política propia."
-          : "Proveedores de la base propia. Las acciones y alcances se definen en Políticas."}
-        action={pestaña === "tradicionales" ? <Button onClick={() => { setError(""); setFormulario(formularioDe()); setProveedorNuevo(""); setAlta(true); }}>Nuevo endpoint</Button> : undefined}
+        subtitle={plataforma
+          ? "Lista central. Lo que publiques queda disponible para que cada tenant arme sus políticas."
+          : pestaña === "shadow"
+            ? "Dominios del feed dinámico que todavía no se adoptaron. Adoptar los pasa a tradicionales para una política propia."
+            : "Lista publicada por la plataforma. Las reglas se crean en Políticas."}
+        action={plataforma ? (
+          <>
+            <Button variant="secondary" onClick={() => { setError(""); setNombreProveedor(""); setAltaProveedor(true); }}>Nuevo proveedor</Button>
+            <Button onClick={() => { setError(""); setFormulario(formularioDe()); setProveedorNuevo(""); setAlta(true); }}>Nuevo endpoint</Button>
+          </>
+        ) : undefined}
       />
-      <div className="mb-4 flex gap-1 border-b border-line">
-        <Pestaña activa={pestaña === "tradicionales"} onClick={() => setPestaña("tradicionales")}>Tradicionales</Pestaña>
-        <Pestaña activa={pestaña === "shadow"} onClick={() => setPestaña("shadow")}>Shadow AI</Pestaña>
-      </div>
+      {plataforma ? null : (
+        <div className="mb-4 flex gap-1 border-b border-line">
+          <Pestaña activa={pestaña === "tradicionales"} onClick={() => setPestaña("tradicionales")}>Tradicionales</Pestaña>
+          <Pestaña activa={pestaña === "shadow"} onClick={() => setPestaña("shadow")}>Shadow AI</Pestaña>
+        </div>
+      )}
       {catalogo.error ? <div className="mb-4"><Alert inline message={catalogo.error} /></div> : null}
       {catalogo.cargando ? <Cargando /> : null}
       {!catalogo.cargando ? (
@@ -180,8 +213,9 @@ export function BaseIa() {
                     <td className="px-4 py-3 font-mono text-xs text-ink">{resumenReceta(fila.receta)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        {fila.externo ? <Button variant="secondary" onClick={() => void adoptar(fila)}>Adoptar</Button> : <Button variant="secondary" onClick={() => abrir(fila)}>Editar fórmula</Button>}
-                        {fila.externo || fila.integrado ? null : <Button variant="secondary" onClick={() => void quitar(fila)}>Quitar</Button>}
+                        {plataforma ? <Button variant="secondary" onClick={() => abrir(fila)}>Editar fórmula</Button> : null}
+                        {plataforma ? <Button variant="secondary" onClick={() => void quitar(fila)}>Quitar</Button> : null}
+                        {!plataforma && fila.externo ? <Button variant="secondary" onClick={() => void adoptar(fila)}>Adoptar</Button> : null}
                       </div>
                     </td>
                   </tr>
@@ -218,6 +252,17 @@ export function BaseIa() {
             {catalogo.datos?.proveedores.filter((proveedor) => !proveedor.externo).map((proveedor) => <option key={proveedor.id} value={proveedor.id}>{proveedor.nombre}</option>)}
           </Select>
           <EditorEndpoint formulario={formulario} onChange={setFormulario} />
+        </form>
+      </Modal>
+      <Modal
+        open={altaProveedor}
+        onClose={() => setAltaProveedor(false)}
+        title="Nuevo proveedor"
+        footer={<div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setAltaProveedor(false)}>Cancelar</Button><Button type="submit" form="form-proveedor">Publicar</Button></div>}
+      >
+        <form id="form-proveedor" onSubmit={crearProveedor} className="space-y-4">
+          {error && altaProveedor ? <Alert inline message={error} /> : null}
+          <Input label="Nombre" value={nombreProveedor} onChange={(evento) => setNombreProveedor(evento.target.value)} placeholder="Proveedor" required />
         </form>
       </Modal>
       {mensaje ? <Alert type="success" message={mensaje} onClose={() => setMensaje("")} /> : null}

@@ -199,14 +199,14 @@ export function Cargando({ texto = "Cargando..." }: { texto?: string }) {
   return <div className="flex min-h-[12rem] items-center justify-center text-muted">{texto}</div>;
 }
 
-export function Marca({ grande = false }: { grande?: boolean }) {
+export function Marca({ grande = false, sigla = "G" }: { grande?: boolean; sigla?: string }) {
   return (
     <div
       className={`flex shrink-0 items-center justify-center rounded-md border border-line-strong bg-accent-soft font-bold text-ink ${
         grande ? "mx-auto mb-4 h-20 w-20 text-3xl" : "h-8 w-8 text-sm"
       }`}
     >
-      G
+      {sigla.slice(0, 2) || "G"}
     </div>
   );
 }

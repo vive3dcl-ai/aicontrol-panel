@@ -1,7 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { navegacion, puertaDeSesion, useSesion } from "../sesion";
+import { ProveedorNotificaciones, useNotificacionesVivas, veCampana } from "../notificaciones-vivo";
+import { useMarca } from "../marca";
+import { navegacion, puertaDeSesion, useSesion, type Usuario } from "../sesion";
 import { ThemeToggle } from "../tema";
+import { Campana } from "./Campana";
 import { Marca } from "./ui";
 import { MenuUsuario } from "./MenuUsuario";
 
@@ -13,7 +16,19 @@ const enlace = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { usuario, salir, salirSoporte } = useSesion();
+  const { usuario } = useSesion();
+  if (!usuario) return null;
+  return (
+    <ProveedorNotificaciones>
+      <Marco usuario={usuario}>{children}</Marco>
+    </ProveedorNotificaciones>
+  );
+}
+
+function Marco({ usuario, children }: { usuario: Usuario; children: ReactNode }) {
+  const { salir, salirSoporte } = useSesion();
+  const marca = useMarca();
+  const { sinLeer } = useNotificacionesVivas();
   const navigate = useNavigate();
   const location = useLocation();
   const [cajon, setCajon] = useState(false);
@@ -31,7 +46,6 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, [cajon]);
 
-  if (!usuario) return null;
   const rol = usuario.rol;
   const items = navegacion(rol);
 
@@ -54,7 +68,12 @@ export function Shell({ children }: { children: ReactNode }) {
     <nav className="space-y-1">
       {items.map((item) => (
         <NavLink key={item.to} to={item.to} end={item.end ?? false} className={enlace} onClick={() => setCajon(false)}>
-          {item.label}
+          <span className="flex items-center justify-between gap-2">
+            {item.label}
+            {item.to === "/notificaciones" && sinLeer > 0 ? (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-label={`${sinLeer} sin leer`} />
+            ) : null}
+          </span>
         </NavLink>
       ))}
     </nav>
@@ -75,13 +94,14 @@ export function Shell({ children }: { children: ReactNode }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Marca />
+          <Marca sigla={marca.sigla} />
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-ink sm:text-lg">AIcontrol</h1>
+            <h1 className="truncate text-base font-semibold text-ink sm:text-lg">{marca.nombre}</h1>
             {usuario.tenantNombre ? <p className="truncate text-xs text-muted">{usuario.tenantNombre}</p> : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {veCampana(usuario) ? <Campana /> : null}
           <ThemeToggle />
           <MenuUsuario nombre={usuario.nombre} correo={usuario.correo} rol={rol} ambito={usuario.ambito} onSalir={cerrar} />
         </div>
@@ -106,8 +126,8 @@ export function Shell({ children }: { children: ReactNode }) {
         >
           <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
             <div className="flex min-w-0 items-center gap-3">
-              <Marca />
-              <p className="truncate text-sm font-semibold text-ink">AIcontrol</p>
+              <Marca sigla={marca.sigla} />
+              <p className="truncate text-sm font-semibold text-ink">{marca.nombre}</p>
             </div>
             <button
               type="button"

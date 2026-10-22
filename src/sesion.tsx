@@ -128,6 +128,10 @@ export function navegacion(rol: string) {
   if (esRolPlataforma(rol)) {
     return [
       { to: "/admin/tenants", label: "Tenants" },
+      { to: "/admin/cluster", label: "Cluster" },
+      { to: "/admin/base-ia", label: "Base de IA" },
+      { to: "/admin/ajustes", label: "Ajustes" },
+      { to: "/admin/registros", label: "Registros" },
       { to: "/flota", label: "Flota" },
       { to: "/usuarios", label: "Usuarios" },
     ];

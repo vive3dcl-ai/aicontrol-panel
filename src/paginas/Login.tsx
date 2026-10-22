@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { useMarca } from "../marca";
 import { destinoInicio, useSesion } from "../sesion";
 import { Alert, Button, Card, Input, Marca } from "../componentes/ui";
 import { cuentaLocalInicial, cuentasLocales, type CuentaLocal } from "../local";
 
 export function LoginCliente() {
   const { usuario, listo, entrar } = useSesion();
+  const marca = useMarca();
   const inicial = cuentaLocalInicial("cliente");
   const [correo, setCorreo] = useState(inicial.correo);
   const [clave, setClave] = useState(inicial.clave);
@@ -33,8 +35,8 @@ export function LoginCliente() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <Marca grande />
-        <h1 className="text-xl font-bold text-ink">AIcontrol</h1>
+        <Marca grande sigla={marca.sigla} />
+        <h1 className="text-xl font-bold text-ink">{marca.nombre}</h1>
         <p className="mt-1 text-sm text-muted">Inicia sesión en tu cuenta</p>
         <form onSubmit={enviar} className="mt-6 space-y-4">
           {error ? <Alert message={error} /> : null}
@@ -52,6 +54,7 @@ export function LoginCliente() {
 
 export function LoginPlataforma() {
   const { usuario, listo, entrar } = useSesion();
+  const marca = useMarca();
   const inicial = cuentaLocalInicial("plataforma");
   const [correo, setCorreo] = useState(inicial.correo);
   const [clave, setClave] = useState(inicial.clave);
@@ -79,8 +82,8 @@ export function LoginPlataforma() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <Marca grande />
-        <h1 className="text-xl font-bold text-ink">AIcontrol Admin</h1>
+        <Marca grande sigla={marca.sigla} />
+        <h1 className="text-xl font-bold text-ink">{marca.nombre} Admin</h1>
         <p className="mt-1 text-sm text-muted">Inicia sesión para gestionar la plataforma</p>
         <form onSubmit={enviar} className="mt-6 space-y-4">
           {error ? <Alert message={error} /> : null}

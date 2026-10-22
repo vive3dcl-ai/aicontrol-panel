@@ -7,7 +7,11 @@ export default defineConfig({
   server: {
     port: 5180,
     proxy: {
-      "/v1": "http://127.0.0.1:7590",
+      "/v1": {
+        target: "http://127.0.0.1:7590",
+        timeout: 0,
+        proxyTimeout: 0,
+      },
       "/salud": "http://127.0.0.1:7590",
     },
   },

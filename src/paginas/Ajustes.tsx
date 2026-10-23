@@ -26,7 +26,7 @@ type AjustesTenant = {
 };
 
 export function Ajustes() {
-  const { usuario } = useSesion();
+  const { usuario, fijarUsuario } = useSesion();
   const { setMode } = useTheme();
   const define = usuario?.rol === "administrador" || usuario?.ambito === "soporte";
   const [ajustes, setAjustes] = useState<AjustesTenant | null>(null);
@@ -100,7 +100,24 @@ export function Ajustes() {
       {cargando ? <Cargando /> : null}
       {!cargando && ajustes ? (
         <div className="space-y-4">
-          {define ? <Organizacion ajustes={ajustes} alGuardar={(siguiente) => { setAjustes(siguiente); setMode(siguiente.tema); }} /> : null}
+          {define ? (
+            <Organizacion
+              ajustes={ajustes}
+              alElegirTema={(elegido) => {
+                try {
+                  localStorage.setItem("gobernanza-tema-fijo", elegido);
+                } catch {
+                  // El tema igual se aplica en esta visita.
+                }
+                setMode(elegido);
+              }}
+              alGuardar={(siguiente) => {
+                setAjustes(siguiente);
+                if (siguiente.tema === "dark") setMode("dark");
+                if (usuario) fijarUsuario({ ...usuario, tema: siguiente.tema });
+              }}
+            />
+          ) : null}
           {define ? <PlanTenant ajustes={ajustes} alGuardar={setAjustes} /> : null}
           <Card>
             <form onSubmit={guardar} className="max-w-lg space-y-4">
@@ -148,7 +165,15 @@ export function Ajustes() {
   );
 }
 
-function Organizacion({ ajustes, alGuardar }: { ajustes: AjustesTenant; alGuardar: (ajustes: AjustesTenant) => void }) {
+function Organizacion({
+  ajustes,
+  alGuardar,
+  alElegirTema,
+}: {
+  ajustes: AjustesTenant;
+  alGuardar: (ajustes: AjustesTenant) => void;
+  alElegirTema: (tema: "light" | "dark") => void;
+}) {
   const [nombre, setNombre] = useState(ajustes.nombre);
   const [tema, setTema] = useState(ajustes.tema);
   const [razonSocial, setRazonSocial] = useState(ajustes.razonSocial);
@@ -181,7 +206,11 @@ function Organizacion({ ajustes, alGuardar }: { ajustes: AjustesTenant; alGuarda
       <p className="mt-1 text-sm text-muted">El tema claro u oscuro se usa en el panel y en los correos de esta organización.</p>
       <form onSubmit={guardar} className="mt-4 grid max-w-3xl gap-4 md:grid-cols-2">
         <Input label="Nombre" value={nombre} onChange={(evento) => setNombre(evento.target.value)} required />
-        <Select label="Tema" value={tema} onChange={(evento) => setTema(evento.target.value === "dark" ? "dark" : "light")}>
+        <Select label="Tema" value={tema} onChange={(evento) => {
+          const elegido = evento.target.value === "dark" ? "dark" : "light";
+          setTema(elegido);
+          alElegirTema(elegido);
+        }}>
           <option value="light">Claro</option>
           <option value="dark">Oscuro</option>
         </Select>

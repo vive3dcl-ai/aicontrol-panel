@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTheme } from "./tema";
 import { Shell } from "./componentes/Shell";
@@ -29,11 +29,35 @@ import { Facturacion } from "./paginas/Facturacion";
 
 function TemaDelTenant() {
   const { usuario } = useSesion();
-  const { setMode } = useTheme();
+  const { resolvedTheme, setMode } = useTheme();
   const tema = usuario?.tema;
+  const resuelto = useRef(resolvedTheme);
+  const aplicar = useRef(setMode);
+  resuelto.current = resolvedTheme;
+  aplicar.current = setMode;
+
   useEffect(() => {
-    if (tema === "light" || tema === "dark") setMode(tema);
-  }, [tema, setMode]);
+    if (tema === "dark") {
+      aplicar.current("dark");
+      return;
+    }
+    if (tema !== "light") return;
+    let fijo: string | null = null;
+    let guardado: string | null = null;
+    try {
+      fijo = localStorage.getItem("gobernanza-tema-fijo");
+      guardado = localStorage.getItem("gobernanza-theme");
+    } catch {
+      // Sin almacenamiento, se deja el tema que ya está en pantalla.
+    }
+    if (fijo === "light") {
+      aplicar.current("light");
+      return;
+    }
+    if (fijo === "dark" || guardado === "dark" || guardado === "system" || resuelto.current === "dark") return;
+    // El ingreso anterior dejó el panel clavado en claro. Se vuelve al tema del sistema.
+    aplicar.current("system");
+  }, [tema, usuario?.tenantId]);
   return null;
 }
 

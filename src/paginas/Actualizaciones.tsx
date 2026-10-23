@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, tokenGuardado } from "../api";
+import { abrirDescarga, api } from "../api";
 import { useLista } from "../datos";
 import { Alert, Badge, Button, Card, Cargando, PageHeader } from "../componentes/ui";
 
@@ -39,31 +39,13 @@ export function Actualizaciones() {
     }
   }
 
-  async function descargar(sistema: string) {
+  function descargar(sistema: string) {
     setError("");
     setMensaje("");
-    setOcupado(`bajar:${sistema}`);
     try {
-      const token = tokenGuardado();
-      const respuesta = await fetch(`/v1/actualizaciones/instalador?sistema=${encodeURIComponent(sistema)}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!respuesta.ok) {
-        const datos = (await respuesta.json().catch(() => ({}))) as { error?: string };
-        throw new Error(datos.error ?? "No se pudo descargar el instalador");
-      }
-      const blob = await respuesta.blob();
-      const enlace = document.createElement("a");
-      enlace.href = URL.createObjectURL(blob);
-      const disposicion = respuesta.headers.get("content-disposition") ?? "";
-      const respaldo = sistema === "darwin" ? "AIcontrol.pkg" : sistema === "linux" ? "AIcontrol-setup.deb" : "AIcontrol-setup.exe";
-      enlace.download = disposicion.match(/filename="([^"]+)"/)?.[1] ?? respaldo;
-      enlace.click();
-      URL.revokeObjectURL(enlace.href);
+      abrirDescarga(`/v1/actualizaciones/instalador?sistema=${encodeURIComponent(sistema)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo descargar el instalador");
-    } finally {
-      setOcupado("");
     }
   }
 
@@ -108,10 +90,10 @@ export function Actualizaciones() {
                 </Button>
                 <Button
                   variant="secondary"
-                  disabled={!sistema.publicada?.tieneInstalador || ocupado === `bajar:${sistema.sistema}`}
+                  disabled={!sistema.publicada?.tieneInstalador}
                   onClick={() => descargar(sistema.sistema)}
                 >
-                  {ocupado === `bajar:${sistema.sistema}` ? "Descargando..." : "Descargar"}
+                  Descargar
                 </Button>
               </div>
             </Card>

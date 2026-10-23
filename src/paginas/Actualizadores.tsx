@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, tokenGuardado } from "../api";
+import { abrirDescarga, api } from "../api";
 import { Alert, Badge, Button, Cargando, Input, Modal, PageHeader, Select, Textarea } from "../componentes/ui";
 
 const SISTEMAS = ["windows", "linux", "darwin"] as const;
@@ -89,29 +89,12 @@ export function Actualizadores() {
     }
   }
 
-  async function descargar(id: string, tipo: "instalador" | "actualizador") {
+  function descargar(id: string, tipo: "instalador" | "actualizador") {
     setError("");
-    setOcupado(`${id}:${tipo}`);
     try {
-      const sesion = tokenGuardado();
-      const respuesta = await fetch(`/v1/actualizadores/versiones/${id}/archivo?tipo=${tipo}`, {
-        headers: sesion ? { Authorization: `Bearer ${sesion}` } : {},
-      });
-      if (!respuesta.ok) {
-        const datos = (await respuesta.json().catch(() => ({}))) as { error?: string };
-        throw new Error(datos.error ?? "No se pudo descargar el archivo");
-      }
-      const blob = await respuesta.blob();
-      const enlace = document.createElement("a");
-      enlace.href = URL.createObjectURL(blob);
-      const disposicion = respuesta.headers.get("content-disposition") ?? "";
-      enlace.download = disposicion.match(/filename="([^"]+)"/)?.[1] ?? tipo;
-      enlace.click();
-      URL.revokeObjectURL(enlace.href);
+      abrirDescarga(`/v1/actualizadores/versiones/${id}/archivo?tipo=${tipo}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo descargar el archivo");
-    } finally {
-      setOcupado("");
     }
   }
 
@@ -203,7 +186,7 @@ function Fila({
   fila: Version;
   ocupado: string;
   onDecidir?: (id: string, accion: "aprobar" | "rechazar") => Promise<void>;
-  onDescargar: (id: string, tipo: "instalador" | "actualizador") => Promise<void>;
+  onDescargar: (id: string, tipo: "instalador" | "actualizador") => void;
 }) {
   const color = fila.estado === "aprobada" ? "green" : fila.estado === "rechazada" ? "red" : "yellow";
   return (
